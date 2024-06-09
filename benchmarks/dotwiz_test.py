@@ -1,8 +1,14 @@
+
 import time
 from dataclasses import asdict, dataclass, make_dataclass
 from typing import Any, Dict, List
 from dotwiz import DotWiz as original
 from main import DotWiz, make_dot_wiz
+import cProfile
+import pstats
+from io import StringIO
+from memory_profiler import profile
+
 
 
 
@@ -25,8 +31,7 @@ def create_large_dataset(size):
         for _ in range(size)
     ]
 
-
-# Function to benchmark DotWiz
+@profile
 def benchmark_dotwiz(data):
     start = time.time()
     dotwiz_instances = [DotWiz(item) for item in data]
@@ -39,14 +44,14 @@ def benchmark_make_dot_wiz(data):
     end = time.time()
     return end - start
 
+@profile
 def benchmark_original(data):
     start = time.time()
     original_instances = [original(item) for item in data]
     end = time.time()
     return end - start
 
-
-# Function to benchmark dataclasses
+@profile
 def benchmark_dataclass(data):
     start = time.time()
     dataclass_instances = [DataClassExample(**item) for item in data]
@@ -60,7 +65,7 @@ def benchmark_make_dataclass(data):
     return end - start
 
 
-# Function to benchmark access time
+@profile
 def benchmark_access(instance_list):
     start = time.time()
     for instance in instance_list:
@@ -71,21 +76,21 @@ def benchmark_access(instance_list):
     return end - start
 
 
-# Function to benchmark dataclass conversion to dict
+@profile
 def benchmark_dataclass_to_dict(data):
     dataclass_instances = [make_dataclass("DataClassExample", item.keys())(**item) for item in data]
     start = time.time()
     dataclass_dicts = [asdict(item) for item in dataclass_instances]
     end = time.time()
     return end - start
-
+@profile
 def benchmark_original_to_dict(data):
     original_dicts = [original(d) for d in data]
     start = time.time()
     out_dicts = [original.to_dict(od) for od in original_dicts]
     end = time.time()
     return end - start
-
+@profile
 def benchmark_dotwiz_to_dict(data):
     dotwiz_dicts = [DotWiz(d) for d in data]
     start = time.time()
@@ -99,9 +104,7 @@ dataset_size = 10000  # Adjust size as needed
 data = create_large_dataset(dataset_size)
 
 
-import cProfile
-import pstats
-from io import StringIO
+
 
 
 # Function to run the benchmark
