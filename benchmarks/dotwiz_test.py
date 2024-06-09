@@ -1,8 +1,9 @@
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, make_dataclass
 from typing import Any, Dict, List
+from dotwiz import DotWiz as original
+from main import DotWiz, make_dot_wiz
 
-from CNC600.pulse.dotwiz import DotWiz
 
 
 # Dataclass implementation
@@ -32,7 +33,16 @@ def benchmark_dotwiz(data):
     end = time.time()
     return end - start
 
+def benchmark_make_dot_wiz(data):
+    start = time.time()
+    dotwiz_instances = [make_dot_wiz(item) for item in data]
+    end = time.time()
+    return end - start
 
+def benchmark_original(data):
+    start = time.time()
+    original_instances = [original(item) for item in data]
+    end = time.time()
     return end - start
 
 
@@ -40,6 +50,12 @@ def benchmark_dotwiz(data):
 def benchmark_dataclass(data):
     start = time.time()
     dataclass_instances = [DataClassExample(**item) for item in data]
+    end = time.time()
+    return end - start
+
+def benchmark_make_dataclass(data):
+    start = time.time()
+    dataclass_instances = [make_dataclass("DataClassExample", item.keys())(**item) for item in data]
     end = time.time()
     return end - start
 
@@ -57,11 +73,18 @@ def benchmark_access(instance_list):
 
 # Function to benchmark dataclass conversion to dict
 def benchmark_dataclass_to_dict(data):
+    dataclass_instances = [make_dataclass("DataClassExample", item.keys())(**item) for item in data]
     start = time.time()
-    dataclass_dicts = [asdict(DataClassExample(**item)) for item in data]
+    dataclass_dicts = [asdict(item) for item in dataclass_instances]
     end = time.time()
     return end - start
 
+def benchmark_original_to_dict(data):
+    original_dicts = [original(d) for d in data]
+    start = time.time()
+    out_dicts = [original.to_dict(od) for od in original_dicts]
+    end = time.time()
+    return end - start
 
 def benchmark_dotwiz_to_dict(data):
     dotwiz_dicts = [DotWiz(d) for d in data]
@@ -84,25 +107,32 @@ from io import StringIO
 # Function to run the benchmark
 def run_benchmark():
     dotwiz_time = benchmark_dotwiz(data)
-   
+    original_time = benchmark_original(data)
     dataclass_time = benchmark_dataclass(data)
+    make_dataclass_time = benchmark_make_dataclass(data)
+    make_dotwiz_time = benchmark_make_dot_wiz(data)
     dotwiz_instances = [DotWiz(item) for item in data]
-
+    original_instances = [original(item) for item in data]
     dataclass_instances = [DataClassExample(**item) for item in data]
     dotwiz_access_time = benchmark_access(dotwiz_instances)
     dotwiz_to_dict_time = benchmark_dotwiz_to_dict(data)
+    orinal_access_time = benchmark_access(original_instances)
+    original_to_dict_time = benchmark_original_to_dict(data)
     dataclass_access_time = benchmark_access(dataclass_instances)
     dataclass_to_dict_time = benchmark_dataclass_to_dict(data)
     print(f"Benchmark results for dataset size {dataset_size}:")
     print(f"DotWiz creation: {dotwiz_time:.4f} seconds")
-
+    print(f"Original creation: {original_time:.4f} seconds")
+    print(f"make_Dataclass creation: {make_dataclass_time:.4f} seconds")
+    print(f"make_dot_wiz creation: {make_dotwiz_time:.4f} seconds")
     print(f"Dataclass creation: {dataclass_time:.4f} seconds")
     print(f"DotWiz access: {dotwiz_access_time:.4f} seconds")
-
-    print(f"Dataclass access: {dataclass_access_time:.4f} seconds")
-    print(f"Dataclass to dict: {dataclass_to_dict_time:.4f} seconds")
+    print(f"Original access: {orinal_access_time:.4f} seconds")
+    print(f"Dataclass access: {dataclass_access_time:.4f} seconds")    
     print(f"DotWiz to dict: {dotwiz_to_dict_time:.4f} seconds")
-
+    print(f"Original to dict: {original_to_dict_time:.4f} seconds")
+    print(f"Dataclass to dict: {dataclass_to_dict_time:.4f} seconds")
+    
 # Profile the benchmark
 pr = cProfile.Profile()
 pr.enable()
