@@ -4,6 +4,7 @@ import json
 import sys
 from _collections_abc import dict_items
 from typing import IO, Any, Generator, Optional
+from line_profiler import profile
 
 __PY_VERSION__ = sys.version_info[:2]
 __PY_38_OR_ABOVE__ = __PY_VERSION__ >= (3, 8)
@@ -32,21 +33,21 @@ def make_dot_wiz(*args, **kwargs):
     kwargs.update(*args)
     return DotWiz(kwargs)
 
-
+#@profile
 def _resolve_value(value, check_lists=True, check_types=True):
     """Resolve value while iterating over a data structure during conversion processes."""
-    if not check_types and not check_lists:
+    if not check_types and not check_lists or not isinstance(value, (list, dict)):   #3.0 for original, 6.9 total for both, this is 4.8
         return value
-    try:
-        if "fromkeys" in value.__dict__:
-            return DotWiz(value, check_lists)
-        if check_lists and "append" in value.__dict__:
-            return [_resolve_value(e, check_lists) for e in value]
-    except AttributeError:
-        pass
-    return value
+    #if not isinstance(value, (list, dict)):                                         #3.9
+        #return value
+    #if check_types and isinstance(value, dict):                3.7 per hit
+    #if check_types and "fromkeys" in value.__class__.__dict__: 4.3 per hit
+    if check_types and hasattr(value, "fromkeys"):             #3.5 per hit
+        return DotWiz(value, check_lists)
+    return [_resolve_value(e, check_lists) for e in value]
 
 
+#@profile
 def _upsert_into_dot_wiz(
     self,
     input_dict: Optional[dict] = None,
@@ -76,13 +77,18 @@ def _upsert_into_dot_wiz(
         return
 
     for key in combined_dict:
-        value = combined_dict[key]
-
-        if hasattr(value, "fromkeys"):
-            value = DotWiz(value, _check_lists)
-        elif _check_lists and hasattr(value, "append"):
-            value = [_resolve_value(e) for e in value]
-        self.__dict__[key] = value
+        #value = combined_dict[key]    #2.9  we can save almost 3 units here by not doing this
+                                             #dict key lookup is faster anyway, so the subsequent calls actually shave off
+                                             #some time for being able to reference a dict key instead of a local
+        if "fromkeys" in combined_dict[key].__class__.__dict__:              #4.2
+        #if hasattr(value, "fromkeys"):                            #6.4?   hasattr is faster when we are checking more than one type
+            self.__dict__[key] = DotWiz(combined_dict[key], _check_lists)   # but checking for method in __dict__ is faster for one check
+            continue
+        if "append" in combined_dict[key].__class__.__dict__:                #4.2
+        #if hasattr(value, "append"):                               #10.7
+            self.__dict__[key] = [_resolve_value(e) for e in combined_dict[key]]
+            continue
+        self.__dict__[key] = combined_dict[key]                     #12.3
 
 
 def _setitem_impl(self, key: Any, value: Any, check_lists: bool = True) -> None:

@@ -3,6 +3,8 @@ from dataclasses import asdict, dataclass, make_dataclass
 from typing import Any, Dict, List
 from dotwiz import DotWiz as original
 from main import DotWiz, make_dot_wiz
+from benchmarks.main_test import DotWiz as lined
+import line_profiler
 
 
 # Dataclass implementation
@@ -29,10 +31,17 @@ def create_large_dataset(size):
     ]
 
 
-# Function to benchmark DotWiz
+# @line_profiler.profile
 def benchmark_dotwiz(data):
     start = time.time()
     dotwiz_instances = [DotWiz(item) for item in data]
+    end = time.time()
+    return end - start
+
+
+def benchmark_lined(data):
+    start = time.time()
+    lined_instances = [lined(item) for item in data]
     end = time.time()
     return end - start
 
@@ -68,7 +77,7 @@ def benchmark_make_dataclass(data):
     return end - start
 
 
-# Function to benchmark access time
+# @line_profiler.profile
 def benchmark_access(instance_list):
     start = time.time()
     for instance in instance_list:
@@ -122,31 +131,35 @@ from io import StringIO
 # Function to run the benchmark
 def run_benchmark():
     dotwiz_time = benchmark_dotwiz(data)
+    lined_time = benchmark_lined(data)
     original_time = benchmark_original(data)
-    dataclass_time = benchmark_dataclass(data)
-    make_dataclass_time = benchmark_make_dataclass(data)
-    make_dotwiz_time = benchmark_make_dot_wiz(data)
-    dotwiz_instances = [DotWiz(item) for item in data]
-    original_instances = [original(item) for item in data]
-    dataclass_instances = [DataClassExample(**item) for item in data]
-    dotwiz_access_time = benchmark_access(dotwiz_instances)
-    dotwiz_to_dict_time = benchmark_dotwiz_to_dict(data)
-    orinal_access_time = benchmark_access(original_instances)
-    original_to_dict_time = benchmark_original_to_dict(data)
-    dataclass_access_time = benchmark_access(dataclass_instances)
-    dataclass_to_dict_time = benchmark_dataclass_to_dict(data)
+    # dataclass_time = benchmark_dataclass(data)
+    # make_dataclass_time = benchmark_make_dataclass(data)
+    # make_dotwiz_time = benchmark_make_dot_wiz(data)
+    # dotwiz_instances = [DotWiz(item) for item in data]
+    # original_instances = [original(item) for item in data]
+    # dataclass_instances = [DataClassExample(**item) for item in data]
+    # dotwiz_access_time = benchmark_access(dotwiz_instances)
+    # dotwiz_to_dict_time = benchmark_dotwiz_to_dict(data)
+    # orinal_access_time = benchmark_access(original_instances)
+    # original_to_dict_time = benchmark_original_to_dict(data)
+    # dataclass_access_time = benchmark_access(dataclass_instances)
+    # dataclass_to_dict_time = benchmark_dataclass_to_dict(data)
     print(f"Benchmark results for dataset size {dataset_size}:")
     print(f"DotWiz creation: {dotwiz_time:.4f} seconds")
+    print(f"Line-optimized DotWiz creation: {lined_time:.4f} seconds")
     print(f"Original creation: {original_time:.4f} seconds")
-    print(f"make_Dataclass creation: {make_dataclass_time:.4f} seconds")
-    print(f"make_dot_wiz creation: {make_dotwiz_time:.4f} seconds")
-    print(f"Dataclass creation: {dataclass_time:.4f} seconds")
-    print(f"DotWiz access: {dotwiz_access_time:.4f} seconds")
-    print(f"Original access: {orinal_access_time:.4f} seconds")
-    print(f"Dataclass access: {dataclass_access_time:.4f} seconds")
-    print(f"DotWiz to dict: {dotwiz_to_dict_time:.4f} seconds")
-    print(f"Original to dict: {original_to_dict_time:.4f} seconds")
-    print(f"Dataclass to dict: {dataclass_to_dict_time:.4f} seconds")
+
+
+# print(f"make_Dataclass creation: {make_dataclass_time:.4f} seconds")
+# print(f"make_dot_wiz creation: {make_dotwiz_time:.4f} seconds")
+# print(f"Dataclass creation: {dataclass_time:.4f} seconds")
+# print(f"DotWiz access: {dotwiz_access_time:.4f} seconds")
+# print(f"Original access: {orinal_access_time:.4f} seconds")
+# print(f"Dataclass access: {dataclass_access_time:.4f} seconds")
+# print(f"DotWiz to dict: {dotwiz_to_dict_time:.4f} seconds")
+# print(f"Original to dict: {original_to_dict_time:.4f} seconds")
+# print(f"Dataclass to dict: {dataclass_to_dict_time:.4f} seconds")
 
 
 # Profile the benchmark
@@ -156,12 +169,11 @@ run_benchmark()
 pr.disable()
 
 # Print profiling results
-# s = StringIO()
-# sortby = "cumulative"
-# ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-# ps.print_stats()
-# print(s.getvalue())
-
-# data = create_large_dataset(1)
+sortby = "cumulative"
+s = StringIO()
+ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+ps.print_stats()
+print(s.getvalue())
 # dw = DotWiz(data[0])
 # print(dw)
+# data = create_large_dataset(1)
