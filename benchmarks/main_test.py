@@ -1,10 +1,10 @@
 """DotWiz - forked from https://github.com/rnag/dotwiz."""
 
 import json
+import os
 import sys
 from _collections_abc import dict_items
 from typing import IO, Any, Generator, Optional
-from line_profiler import profile
 
 __PY_VERSION__ = sys.version_info[:2]
 __PY_38_OR_ABOVE__ = __PY_VERSION__ >= (3, 8)
@@ -33,26 +33,25 @@ def make_dot_wiz(*args, **kwargs):
     kwargs.update(*args)
     return DotWiz(kwargs)
 
-#@profile
-def _resolve_value(value, check_lists=True, check_types=True):
+
+def _resolve_value(value, preprocess=True):
     """Resolve value while iterating over a data structure during conversion processes."""
-    if not check_types and not check_lists or not isinstance(value, (list, dict)):   #3.0 for original, 6.9 total for both, this is 4.8
+    if not preprocess or not isinstance(value, (list, dict)):   #3.0 for original, 6.9 total for both, this is 4.8
         return value
-    #if not isinstance(value, (list, dict)):                                         #3.9
-        #return value
-    #if check_types and isinstance(value, dict):                3.7 per hit
-    #if check_types and "fromkeys" in value.__class__.__dict__: 4.3 per hit
-    if check_types and hasattr(value, "fromkeys"):             #3.5 per hit
-        return DotWiz(value, check_lists)
-    return [_resolve_value(e, check_lists) for e in value]
+    try:
+        if preprocess and "append" in value.__class__.__dict__:
+            return [_resolve_value(e, preprocess) for e in value]
+        if "fromkeys" in value.__class__.__dict__:
+            return DotWiz(value, preprocess)
+    except AttributeError:
+        pass
+    return value
 
 
-#@profile
 def _upsert_into_dot_wiz(
     self,
     input_dict: Optional[dict] = None,
-    _check_lists: Optional[bool] = True,
-    _check_types: Optional[bool] = True,
+    preprocess: Optional[bool]=False,
     **kwargs,
 ) -> "DotWiz":
     """Create or update a `DotWiz` from a dict and optional keyword arguments.
@@ -61,41 +60,38 @@ def _upsert_into_dot_wiz(
     ----
         self (`DotWiz`): DotWiz instance.
         input_dict (Optional[dict]): Input dict.
-        _check_lists (Optional[bool]): `False` to not check for nested list values.
-            Defaults to `True`.
-        _check_types (Optional[bool]): `False` to skip recursive processing of dict and list
-            values. Defaults to `True`.
+        preprocess (Optional[bool]): Whether to convert internal dictionary objects at instantion or not.
         kwargs: Optional keyword arguments.
 
     """
+    self.preprocess = preprocess
+    
     if not kwargs and not input_dict:
         return
 
     combined_dict = {**input_dict, **kwargs} if input_dict else kwargs
-    if not _check_types:
+    if not preprocess:
         self.__dict__.update(combined_dict)
         return
 
     for key in combined_dict:
-        #value = combined_dict[key]    #2.9  we can save almost 3 units here by not doing this
-                                             #dict key lookup is faster anyway, so the subsequent calls actually shave off
-                                             #some time for being able to reference a dict key instead of a local
-        if "fromkeys" in combined_dict[key].__class__.__dict__:              #4.2
-        #if hasattr(value, "fromkeys"):                            #6.4?   hasattr is faster when we are checking more than one type
-            self.__dict__[key] = DotWiz(combined_dict[key], _check_lists)   # but checking for method in __dict__ is faster for one check
+        # value = combined_dict[key]    #2.9  we can save almost 3 units here by not doing this
+        # dict key lookup is faster anyway, so the subsequent calls actually shave off
+        # some time for being able to reference a dict key instead of a local
+        if "fromkeys" in combined_dict[key].__class__.__dict__:  # 4.2
+            # if hasattr(value, "fromkeys"):                            #6.4?   hasattr is faster when we are checking more than one type
+            self.__dict__[key] = DotWiz(
+                combined_dict[key], preprocess
+            )  # but checking for method in __dict__ is faster for one check
             continue
-        if "append" in combined_dict[key].__class__.__dict__:                #4.2
-        #if hasattr(value, "append"):                               #10.7
+        if "append" in combined_dict[key].__class__.__dict__:  # 4.2
+            # if hasattr(value, "append"):                               #10.7
             self.__dict__[key] = [_resolve_value(e) for e in combined_dict[key]]
             continue
-        self.__dict__[key] = combined_dict[key]                     #12.3
+        self.__dict__[key] = combined_dict[key]  # 12.3
 
 
-def _setitem_impl(self, key: Any, value: Any, check_lists: bool = True) -> None:
-    """Implement `DotWiz.__setitem__` to preserve dot access."""
-    value = _resolve_value(value, check_lists)
 
-    self.__dict__[key] = value
 
 
 if __PY_38_OR_ABOVE__:
@@ -197,6 +193,13 @@ class DotWiz:
     def __ne__(self, other) -> bool:
         """Implement != operator."""
         return self.__dict__ != other
+    
+    def _setitem_impl(self, key: Any, value: Any, preprocess: bool = True) -> None:
+        """Implement `DotWiz.__setitem__` to preserve dot access."""
+        if key in ("__dict__", "preprocess"):
+            super().__setattr__(key, value)
+        else:
+            self.__dict__[key] = _resolve_value(value, preprocess)
 
     @classmethod
     def __class_getitem__(cls, _: "type | tuple[type]") -> type:
@@ -219,7 +222,26 @@ class DotWiz:
 
     def __getattr__(self, item: str, __default=None) -> Any:
         """Implement `__getattr__` with default dict behavior."""
-        return self.get(item, __default)
+        if item in self.__dict__:
+            value = self.__dict__[item]
+            if isinstance(value, dict) and not self.preprocess:
+                value = DotWiz(value)
+                self.__dict__[item] = value
+            return value
+        self.__dict__[item] = __default
+        return __default
+    
+    def __getattribute__(self, name):
+        if name in ('preprocess', '__dict__', '__class__', '__slots__', '_upsert_into_dot_wiz', '_resolve_value'):
+            return super().__getattribute__(name)
+        try:
+            value = super().__getattribute__('__dict__')[name]
+            if isinstance(value, dict) and not super().__getattribute__('preprocess'):
+                value = DotWiz(value)
+                super().__getattribute__('__dict__')[name] = value
+            return value
+        except KeyError:
+            return super().__getattribute__(name)
 
     __setattr__ = __setitem__ = _setitem_impl
 
