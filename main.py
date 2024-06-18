@@ -28,14 +28,16 @@ class DotWizEncoder(json.JSONEncoder):
 
 
 def make_dot_wiz(*args, **kwargs):
-    """Create and return a `DotWiz` from an `Iterable` and optional keyword arguments."""
+    """Create and return a `DotWiz` from a dict and optional keyword arguments."""
     kwargs.update(*args)
     return DotWiz(kwargs)
 
 
 def _resolve_value(value, preprocess=True):
     """Resolve value while iterating over a data structure during conversion processes."""
-    if not preprocess or not isinstance(value, (list, dict)):   #3.0 for original, 6.9 total for both, this is 4.8
+    if not preprocess or not isinstance(
+        value, (list, dict)
+    ):  # 3.0 for original, 6.9 total for both, this is 4.8
         return value
     try:
         if preprocess and "append" in value.__class__.__dict__:
@@ -50,7 +52,7 @@ def _resolve_value(value, preprocess=True):
 def _upsert_into_dot_wiz(
     self,
     input_dict: Optional[dict] = None,
-    preprocess: Optional[bool]=False,
+    preprocess: Optional[bool] = False,
     **kwargs,
 ) -> "DotWiz":
     """Create or update a `DotWiz` from a dict and optional keyword arguments.
@@ -59,12 +61,11 @@ def _upsert_into_dot_wiz(
     ----
         self (`DotWiz`): DotWiz instance.
         input_dict (Optional[dict]): Input dict.
-        preprocess (Optional[bool]): Whether to convert internal dictionary objects at instantion or not.
+        preprocess (Optional[bool]): Whether to convert internal dictionary objects at instantion or
+        not.
         kwargs: Optional keyword arguments.
 
     """
-    self.preprocess = preprocess
-    
     if not kwargs and not input_dict:
         return
 
@@ -74,23 +75,15 @@ def _upsert_into_dot_wiz(
         return
 
     for key in combined_dict:
-        # value = combined_dict[key]    #2.9  we can save almost 3 units here by not doing this
-        # dict key lookup is faster anyway, so the subsequent calls actually shave off
-        # some time for being able to reference a dict key instead of a local
-        if "fromkeys" in combined_dict[key].__class__.__dict__:  # 4.2
-            # if hasattr(value, "fromkeys"):                            #6.4?   hasattr is faster when we are checking more than one type
+        if "fromkeys" in combined_dict[key].__class__.__dict__:
             self.__dict__[key] = DotWiz(
                 combined_dict[key], preprocess
-            )  # but checking for method in __dict__ is faster for one check
+            )
             continue
-        if "append" in combined_dict[key].__class__.__dict__:  # 4.2
-            # if hasattr(value, "append"):                               #10.7
+        if "append" in combined_dict[key].__class__.__dict__:
             self.__dict__[key] = [_resolve_value(e) for e in combined_dict[key]]
             continue
-        self.__dict__[key] = combined_dict[key]  # 12.3
-
-
-
+        self.__dict__[key] = combined_dict[key]
 
 
 if __PY_38_OR_ABOVE__:
@@ -170,7 +163,7 @@ class DotWiz:
 
     __init__ = update = _upsert_into_dot_wiz
 
-    print_char = "☣"
+    #print_char = "☣"
 
     def __bool__(self) -> bool:
         """Implement `__bool__`."""
@@ -192,7 +185,7 @@ class DotWiz:
     def __ne__(self, other) -> bool:
         """Implement != operator."""
         return self.__dict__ != other
-    
+
     def _setitem_impl(self, key: Any, value: Any, preprocess: bool = True) -> None:
         """Implement `DotWiz.__setitem__` to preserve dot access."""
         if key in ("__dict__", "preprocess"):
@@ -229,15 +222,23 @@ class DotWiz:
             return value
         self.__dict__[item] = __default
         return __default
-    
+
     def __getattribute__(self, name):
-        if name in ('preprocess', '__dict__', '__class__', '__slots__', '_upsert_into_dot_wiz', '_resolve_value'):
+        """Override getattribute to implement preprocessing logic."""
+        if name in (
+            "preprocess",
+            "__dict__",
+            "__class__",
+            "__slots__",
+            "_upsert_into_dot_wiz",
+            "_resolve_value",
+        ):
             return super().__getattribute__(name)
         try:
-            value = super().__getattribute__('__dict__')[name]
-            if isinstance(value, dict) and not super().__getattribute__('preprocess'):
+            value = super().__getattribute__("__dict__")[name]
+            if isinstance(value, dict) and not super().__getattribute__("preprocess"):
                 value = DotWiz(value)
-                super().__getattribute__('__dict__')[name] = value
+                super().__getattribute__("__dict__")[name] = value
             return value
         except KeyError:
             return super().__getattribute__(name)
@@ -254,7 +255,7 @@ class DotWiz:
 
     def __repr__(self) -> str:
         """Implement `__repr__`."""
-        return f'{self.print_char} ({", ".join(f"{k}={v!r}" for k, v in self)})'
+        return f'({", ".join(f"{k}={v!r}" for k, v in self)})'
 
     __or__ = _or_impl
     __ior__ = _ior_impl
@@ -305,7 +306,10 @@ class DotWiz:
         self.__dict__[k] = default = _resolve_value(k, check_lists)
 
         return default
-
+    def __iter__(self):
+        keys = [attr for attr in self.__dict__.keys() if not attr.startswith('_')]
+        yield from [self.__dict__[key] for key in keys]
+    
     def values(self) -> list:
         """Implement `values`."""
         return self.__dict__.values()
@@ -313,7 +317,7 @@ class DotWiz:
     @classmethod
     def from_json(
         cls,
-        json: Optional[str] = None,
+        jsons: Optional[str] = None,
         file: Optional[IO] = None,
         multiline: bool = False,
         **kwargs,
@@ -322,7 +326,7 @@ class DotWiz:
 
         Args:
         ----
-            json (Optional[str]): A JSON string to de-serialize.
+            jsons (Optional[str]): A JSON string to de-serialize.
             file (Optional[IO]): If provided, will instead read from a file.
             multiline (bool): If enabled, reads the file in JSONL format,
                 i.e. where each line in the file represents a JSON object.
@@ -340,7 +344,7 @@ class DotWiz:
             """
             return cls(d, _check_types=False)
 
-        if not json and not file:
+        if not jsons and not file:
             raise ValueError("Either a JSON string or a file must be provided.")
 
         if file:
@@ -355,7 +359,7 @@ class DotWiz:
                     else json.load(f, object_hook=__object_hook, **kwargs)
                 )
 
-        return json.loads(json, object_hook=__object_hook, **kwargs)
+        return json.loads(jsons, object_hook=__object_hook, **kwargs)
 
     @staticmethod
     def to_dict(o: "DotWiz", keep_snakes: bool = True) -> dict:
@@ -378,8 +382,7 @@ class DotWiz:
             return o
         elif all((hasattr(o, "fromkeys"), hasattr(o, "from_json"))):
             return {
-                k if keep_snakes else k.strip("_"): DotWiz.to_dict(v, keep_snakes)
-                for k, v in o
+                k if keep_snakes else k.strip("_"): DotWiz.to_dict(v, keep_snakes) for k, v in o
             }
         return type(o)(DotWiz.to_dict(e, keep_snakes) for e in o)
 

@@ -46,7 +46,7 @@ def benchmark_make_dot_wiz(data):
     return end - start
 
 
-@profile
+#@profile
 def benchmark_original(data):
     start = time.time()
     original_instances = [original(item) for item in data]
@@ -54,7 +54,7 @@ def benchmark_original(data):
     return end - start
 
 
-@profile
+#@profile
 def benchmark_dataclass(data):
     start = time.time()
     dataclass_instances = [DataClassExample(**item) for item in data]
@@ -71,7 +71,7 @@ def benchmark_make_dataclass(data):
     return end - start
 
 
-@profile
+#@profile
 def benchmark_access(instance_list):
     start = time.time()
     for instance in instance_list:
@@ -82,7 +82,7 @@ def benchmark_access(instance_list):
     return end - start
 
 
-@profile
+#@profile
 def benchmark_dataclass_to_dict(data):
     dataclass_instances = [
         make_dataclass("DataClassExample", item.keys())(**item) for item in data
@@ -93,7 +93,7 @@ def benchmark_dataclass_to_dict(data):
     return end - start
 
 
-@profile
+#@profile
 def benchmark_original_to_dict(data):
     original_dicts = [original(d) for d in data]
     start = time.time()
@@ -102,7 +102,7 @@ def benchmark_original_to_dict(data):
     return end - start
 
 
-@profile
+#@profile
 def benchmark_dotwiz_to_dict(data):
     dotwiz_dicts = [DotWiz(d) for d in data]
     start = time.time()

@@ -2,7 +2,8 @@ import time
 from dataclasses import asdict, dataclass, make_dataclass
 from typing import Any, Dict, List
 from dotwiz import DotWiz as original
-from main_test import DotWiz, make_dot_wiz
+from main import DotWiz, make_dot_wiz
+from dotwiz import DotWiz as current
 #from main_test import DotWiz as lined
 #import line_profiler
 
@@ -42,9 +43,9 @@ def benchmark_dotwiz(data):
 
 
 
-def benchmark_lined(data):
+def benchmark_current(data):
     start = time.time()
-    lined_instances = [lined(item) for item in data]
+    lined_instances = [current(item) for item in data]
     end = time.time()
     return end - start
 
@@ -136,6 +137,7 @@ from io import StringIO
 # Function to run the benchmark
 def run_benchmark():
     dotwiz_time = benchmark_dotwiz(data)
+    current_time = benchmark_current(data)
 
     #lined_time = benchmark_lined(data)
     #original_time = benchmark_original(data)
@@ -156,6 +158,7 @@ def run_benchmark():
     # dataclass_to_dict_time = benchmark_dataclass_to_dict(data)
     print(f"Benchmark results for dataset size {dataset_size}:")
     print(f"DotWiz creation: {dotwiz_time:.4f} seconds")
+    print(f"current creation: {current_time:.4f}")
 
     #print(f"Line-optimized DotWiz creation: {lined_time:.4f} seconds")
     #print(f"Original creation: {original_time:.4f} seconds")
